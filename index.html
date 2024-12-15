@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<style>
+			body {
+				margin: 0;
+			}
+			canvas {
+				display: block;
+			}
+			#scene-container {
+				position: fixed;
+				width: 100%;
+				height: 100%;
+				background: url('winter-scene.jpg') no-repeat center center fixed;
+				background-size: cover;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="scene-container"></div>
+		<script type="module">
+			import * as THREE from 'three';
+
+			// Scene setup
+			const scene = new THREE.Scene();
+			const camera = new THREE.PerspectiveCamera(
+				75,
+				window.innerWidth / window.innerHeight,
+				0.1,
+				1000
+			);
+			const renderer = new THREE.WebGLRenderer({
+				alpha: true,
+				antialias: true,
+			});
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			document.getElementById('scene-container').appendChild(renderer.domElement);
+
+			// Create detailed snowflake geometry
+			function createSnowflakeGeometry(size) {
+				const geometry = new THREE.BufferGeometry();
+				const vertices = [];
+
+				// Create six arms of the snowflake
+				for (let i = 0; i < 6; i++) {
+					const angle = (i * Math.PI * 2) / 6;
+
+					// Main arm
+					vertices.push(0, 0, 0);
+					vertices.push(Math.cos(angle) * size, Math.sin(angle) * size, 0);
+
+					// Secondary branches
+					const subSize = size * 0.6;
+					const subAngle1 = angle + Math.PI / 6;
+					const subAngle2 = angle - Math.PI / 6;
+
+					vertices.push(Math.cos(angle) * size * 0.5, Math.sin(angle) * size * 0.5, 0);
+					vertices.push(
+						Math.cos(angle) * size * 0.5 + Math.cos(subAngle1) * subSize * 0.5,
+						Math.sin(angle) * size * 0.5 + Math.sin(subAngle1) * subSize * 0.5,
+						0
+					);
+
+					vertices.push(Math.cos(angle) * size * 0.5, Math.sin(angle) * size * 0.5, 0);
+					vertices.push(
+						Math.cos(angle) * size * 0.5 + Math.cos(subAngle2) * subSize * 0.5,
+						Math.sin(angle) * size * 0.5 + Math.sin(subAngle2) * subSize * 0.5,
+						0
+					);
+				}
+
+				geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+				return geometry;
+			}
+
+			// Create snowflake instances
+			const snowflakes = [];
+			const snowflakeCount = 1000; // Increased count for better coverage
+
+			for (let i = 0; i < snowflakeCount; i++) {
+				const size = Math.random() * 0.5 + 0.3;
+				const geometry = createSnowflakeGeometry(size);
+
+				const material = new THREE.LineBasicMaterial({
+					color: 0xffffff,
+					transparent: true,
+					opacity: Math.random() * 0.5 + 0.5,
+				});
+
+				const snowflake = new THREE.LineSegments(geometry, material);
+
+				// Random position
+				snowflake.position.set(
+					Math.random() * 200 - 100, // Doubled spread on X axis
+					Math.random() * 200 - 100, // Doubled spread on Y axis
+					Math.random() * 100 - 50 // Doubled spread on Z axis
+				);
+
+				// Random rotation
+				snowflake.rotation.z = Math.random() * Math.PI;
+
+				// Custom properties for animation
+				snowflake.userData.rotationSpeed = (Math.random() - 0.5) * 0.01;
+				// Much more varied fall speeds
+				snowflake.userData.fallSpeed = Math.random() * 0.15 + 0.01;
+				snowflake.userData.wobbleSpeed = Math.random() * 0.02;
+				snowflake.userData.wobbleAmplitude = Math.random() * 0.1;
+				snowflake.userData.initialX = snowflake.position.x;
+
+				snowflakes.push(snowflake);
+				scene.add(snowflake);
+			}
+
+			// Position camera
+			camera.position.z = 50;
+
+			// Animation function
+			function animate() {
+				requestAnimationFrame(animate);
+
+				snowflakes.forEach((snowflake) => {
+					// Falling movement
+					snowflake.position.y -= snowflake.userData.fallSpeed;
+
+					// Rotation
+					snowflake.rotation.z += snowflake.userData.rotationSpeed;
+
+					// Wobble movement
+					snowflake.position.x =
+						snowflake.userData.initialX +
+						Math.sin(Date.now() * snowflake.userData.wobbleSpeed) *
+							snowflake.userData.wobbleAmplitude;
+
+					// Reset position if snowflake goes below view
+					if (snowflake.position.y < -100) {
+						snowflake.position.y = 100;
+						snowflake.position.x = Math.random() * 200 - 100;
+						snowflake.userData.initialX = snowflake.position.x;
+					}
+				});
+
+				renderer.render(scene, camera);
+			}
+
+			// Handle window resize
+			window.addEventListener('resize', onWindowResize, false);
+
+			function onWindowResize() {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize(window.innerWidth, window.innerHeight);
+			}
+
+			// Start animation
+			animate();
+		</script>
+	</body>
+</html>
