@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html>
 	<head>
+		<link
+			href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&display=swap"
+			rel="stylesheet"
+		/>
 		<style>
 			body {
 				margin: 0;
@@ -15,12 +19,86 @@
 				background: url('winter-scene.jpg') no-repeat center center fixed;
 				background-size: cover;
 			}
+			.message-container {
+				position: fixed;
+				bottom: 0;
+				left: 0;
+				right: 0;
+				height: 22rem;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: linear-gradient(
+					to top,
+					rgba(0, 0, 0, 0.9) 0%,
+					rgba(0, 0, 0, 0.8) 60%,
+					transparent 100%
+				);
+				font-family: 'Cormorant Garamond', serif;
+				color: white;
+				z-index: 1000;
+				opacity: 0;
+				transition: opacity 2s ease-out;
+			}
+			.message-text {
+				max-width: 800px;
+				font-size: 1.8rem;
+				line-height: 1.5;
+				text-align: center;
+				text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+				margin-top: 8rem;
+			}
+			.fade-in {
+				opacity: 1;
+			}
+			#start-heart {
+				position: fixed;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				width: 200px;
+				height: 200px;
+				cursor: pointer;
+				z-index: 2000;
+				transition: all 0.3s ease;
+				background: none;
+				border: none;
+				outline: none;
+			}
+			#start-heart path {
+				fill: rgba(255, 0, 0, 0.8);
+				transition: fill 0.3s ease;
+			}
+			#start-heart:hover path {
+				fill: rgba(255, 50, 50, 0.9);
+			}
+			.hidden {
+				display: none !important;
+			}
 		</style>
 	</head>
 	<body>
 		<div id="scene-container"></div>
+		<button id="start-heart">
+			<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+				<path
+					d="M256 448l-30.164-27.211C118.718 322.442 48 258.61 48 179.095 48 114.221 97.918 64 162.4 64c36.399 0 70.717 16.742 93.6 43.947C278.882 80.742 313.199 64 349.6 64 414.082 64 464 114.221 464 179.095c0 79.516-70.719 143.348-177.836 241.694L256 448z"
+				/>
+			</svg>
+		</button>
+		<div class="message-container">
+			<div class="message-text">
+				Though this is our first Christmas together, and we haven't been together for long, I know I
+				love you more than I ever thought possible. I look forward to many more Christmas mornings
+				with you. I can't imagine life without you by my side.
+			</div>
+		</div>
 		<script type="module">
 			import * as THREE from 'three';
+
+			// Audio setup
+			const backgroundMusic = new Audio('christmas-ambient.mp3');
+			backgroundMusic.loop = false;
 
 			// Scene setup
 			const scene = new THREE.Scene();
@@ -37,20 +115,70 @@
 			renderer.setSize(window.innerWidth, window.innerHeight);
 			document.getElementById('scene-container').appendChild(renderer.domElement);
 
-			// Create detailed snowflake geometry
+			// Create explosion heart particles
+			function createExplosionParticles(count) {
+				const particles = [];
+				const heartGeometry = createHeartGeometry(0.2);
+
+				for (let i = 0; i < count; i++) {
+					const material = new THREE.MeshBasicMaterial({
+						color: new THREE.Color(
+							Math.random() > 0.33 ? 1 : 0.5,
+							Math.random() > 0.33 ? 0 : 0.5,
+							Math.random() > 0.33 ? 0 : 0.8
+						),
+						transparent: true,
+						opacity: 0.8,
+						side: THREE.DoubleSide,
+					});
+
+					const heart = new THREE.Mesh(heartGeometry, material);
+
+					// Set initial position at center
+					heart.position.set(0, 0, 0);
+
+					// Random explosion direction
+					const theta = Math.random() * Math.PI * 2;
+					const phi = Math.random() * Math.PI;
+					const speed = Math.random() * 2 + 1;
+
+					heart.userData.velocity = new THREE.Vector3(
+						Math.sin(phi) * Math.cos(theta) * speed,
+						Math.sin(phi) * Math.sin(theta) * speed,
+						Math.cos(phi) * speed
+					);
+
+					heart.userData.rotationSpeed = (Math.random() - 0.5) * 0.1;
+
+					particles.push(heart);
+					scene.add(heart);
+				}
+				return particles;
+			}
+
+			// Existing geometry creation functions
+			function createHeartGeometry(size) {
+				const shape = new THREE.Shape();
+				const x = 0,
+					y = 0;
+
+				shape.moveTo(x, y);
+				shape.bezierCurveTo(x, y + size * 0.5, x + size * 0.5, y + size, x, y + size);
+				shape.bezierCurveTo(x - size * 0.5, y + size, x - size, y + size * 0.5, x, y);
+
+				const geometry = new THREE.ShapeGeometry(shape);
+				return geometry;
+			}
+
 			function createSnowflakeGeometry(size) {
 				const geometry = new THREE.BufferGeometry();
 				const vertices = [];
 
-				// Create six arms of the snowflake
 				for (let i = 0; i < 6; i++) {
 					const angle = (i * Math.PI * 2) / 6;
-
-					// Main arm
 					vertices.push(0, 0, 0);
 					vertices.push(Math.cos(angle) * size, Math.sin(angle) * size, 0);
 
-					// Secondary branches
 					const subSize = size * 0.6;
 					const subAngle1 = angle + Math.PI / 6;
 					const subAngle2 = angle - Math.PI / 6;
@@ -74,69 +202,131 @@
 				return geometry;
 			}
 
-			// Create snowflake instances
-			const snowflakes = [];
-			const snowflakeCount = 1000; // Increased count for better coverage
+			// Create regular snow particles
+			const snowParticles = [];
+			const particleCount = 1000;
 
-			for (let i = 0; i < snowflakeCount; i++) {
+			for (let i = 0; i < particleCount; i++) {
 				const size = Math.random() * 0.5 + 0.3;
 				const geometry = createSnowflakeGeometry(size);
-
 				const material = new THREE.LineBasicMaterial({
 					color: 0xffffff,
 					transparent: true,
 					opacity: Math.random() * 0.5 + 0.5,
 				});
 
-				const snowflake = new THREE.LineSegments(geometry, material);
+				const particle = new THREE.LineSegments(geometry, material);
 
-				// Random position
-				snowflake.position.set(
-					Math.random() * 200 - 100, // Doubled spread on X axis
-					Math.random() * 200 - 100, // Doubled spread on Y axis
-					Math.random() * 100 - 50 // Doubled spread on Z axis
+				particle.position.set(
+					Math.random() * 200 - 100,
+					Math.random() * 200 - 100,
+					Math.random() * 100 - 50
 				);
 
-				// Random rotation
-				snowflake.rotation.z = Math.random() * Math.PI;
+				particle.userData.rotationSpeed = (Math.random() - 0.5) * 0.01;
+				particle.userData.fallSpeed = Math.random() * 0.15 + 0.01;
+				particle.userData.wobbleSpeed = Math.random() * 0.02;
+				particle.userData.wobbleAmplitude = Math.random() * 0.1;
+				particle.userData.initialX = particle.position.x;
+				particle.userData.isHeart = false;
 
-				// Custom properties for animation
-				snowflake.userData.rotationSpeed = (Math.random() - 0.5) * 0.01;
-				// Much more varied fall speeds
-				snowflake.userData.fallSpeed = Math.random() * 0.15 + 0.01;
-				snowflake.userData.wobbleSpeed = Math.random() * 0.02;
-				snowflake.userData.wobbleAmplitude = Math.random() * 0.1;
-				snowflake.userData.initialX = snowflake.position.x;
-
-				snowflakes.push(snowflake);
-				scene.add(snowflake);
+				snowParticles.push(particle);
+				scene.add(particle);
 			}
 
-			// Position camera
 			camera.position.z = 50;
+
+			let explosionParticles = [];
+			let explosionTime = 0;
+			const explosionDuration = 2000; // 2 seconds for explosion animation
+
+			// Start button handler
+			document.getElementById('start-heart').addEventListener('click', function () {
+				this.classList.add('hidden');
+
+				// Create explosion particles
+				explosionParticles = createExplosionParticles(50);
+				explosionTime = Date.now();
+
+				// Start background music
+				backgroundMusic.play();
+
+				// Fade in text
+				setTimeout(() => {
+					document.querySelector('.message-container').classList.add('fade-in');
+				}, 1000);
+
+				// Transform snowflakes after music
+				setTimeout(() => {
+					snowParticles.forEach((particle, index) => {
+						setTimeout(() => {
+							const size = Math.random() * 0.3 + 0.2;
+							const heartGeometry = createHeartGeometry(size);
+							const heartMaterial = new THREE.MeshBasicMaterial({
+								color: new THREE.Color(
+									Math.random() > 0.33 ? 1 : 0.5,
+									Math.random() > 0.33 ? 0 : 0.5,
+									Math.random() > 0.33 ? 0 : 0.8
+								),
+								transparent: true,
+								opacity: 0.8,
+								side: THREE.DoubleSide,
+							});
+
+							const heart = new THREE.Mesh(heartGeometry, heartMaterial);
+							heart.position.copy(particle.position);
+							heart.userData = { ...particle.userData, isHeart: true };
+
+							scene.remove(particle);
+							scene.add(heart);
+							snowParticles[index] = heart;
+						}, Math.random() * 1000);
+					});
+				}, 10000);
+			});
 
 			// Animation function
 			function animate() {
 				requestAnimationFrame(animate);
 
-				snowflakes.forEach((snowflake) => {
-					// Falling movement
-					snowflake.position.y -= snowflake.userData.fallSpeed;
+				// Animate explosion particles
+				if (explosionParticles.length > 0) {
+					const elapsed = Date.now() - explosionTime;
+					const progress = Math.min(elapsed / explosionDuration, 1);
 
-					// Rotation
-					snowflake.rotation.z += snowflake.userData.rotationSpeed;
+					explosionParticles.forEach((particle, i) => {
+						particle.position.add(particle.userData.velocity);
+						particle.rotation.z += particle.userData.rotationSpeed;
+						particle.material.opacity = Math.max(0, 1 - progress);
 
-					// Wobble movement
-					snowflake.position.x =
-						snowflake.userData.initialX +
-						Math.sin(Date.now() * snowflake.userData.wobbleSpeed) *
-							snowflake.userData.wobbleAmplitude;
+						if (progress === 1) {
+							scene.remove(particle);
+							if (i === explosionParticles.length - 1) {
+								explosionParticles = [];
+							}
+						}
+					});
+				}
 
-					// Reset position if snowflake goes below view
-					if (snowflake.position.y < -100) {
-						snowflake.position.y = 100;
-						snowflake.position.x = Math.random() * 200 - 100;
-						snowflake.userData.initialX = snowflake.position.x;
+				// Animate snow/heart particles
+				snowParticles.forEach((particle) => {
+					particle.position.y -= particle.userData.fallSpeed;
+
+					if (particle.userData.isHeart) {
+						particle.rotation.z += particle.userData.rotationSpeed * 0.5;
+					} else {
+						particle.rotation.z += particle.userData.rotationSpeed;
+					}
+
+					particle.position.x =
+						particle.userData.initialX +
+						Math.sin(Date.now() * particle.userData.wobbleSpeed) *
+							particle.userData.wobbleAmplitude;
+
+					if (particle.position.y < -100) {
+						particle.position.y = 100;
+						particle.position.x = Math.random() * 200 - 100;
+						particle.userData.initialX = particle.position.x;
 					}
 				});
 
