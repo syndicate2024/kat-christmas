@@ -48,29 +48,25 @@
 				text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 				margin-top: 8rem;
 			}
-			.fade-in {
-				opacity: 1;
-			}
-			#start-heart {
+			.start-heart {
 				position: fixed;
 				top: 50%;
 				left: 50%;
 				transform: translate(-50%, -50%);
-				width: 200px;
-				height: 200px;
+				width: 150px;
+				height: 150px;
 				cursor: pointer;
 				z-index: 2000;
-				transition: all 0.3s ease;
 				background: none;
 				border: none;
 				outline: none;
+				transition: transform 0.3s ease;
 			}
-			#start-heart path {
-				fill: rgba(255, 0, 0, 0.8);
-				transition: fill 0.3s ease;
+			.start-heart:hover {
+				transform: translate(-50%, -50%) scale(1.1);
 			}
-			#start-heart:hover path {
-				fill: rgba(255, 50, 50, 0.9);
+			.fade-in {
+				opacity: 1;
 			}
 			.hidden {
 				display: none !important;
@@ -79,10 +75,11 @@
 	</head>
 	<body>
 		<div id="scene-container"></div>
-		<button id="start-heart">
-			<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+		<button class="start-heart" id="start-button">
+			<svg viewBox="0 0 100 100" width="100%" height="100%">
 				<path
-					d="M256 448l-30.164-27.211C118.718 322.442 48 258.61 48 179.095 48 114.221 97.918 64 162.4 64c36.399 0 70.717 16.742 93.6 43.947C278.882 80.742 313.199 64 349.6 64 414.082 64 464 114.221 464 179.095c0 79.516-70.719 143.348-177.836 241.694L256 448z"
+					fill="#9370DB"
+					d="M50,88.87 C76.67,70.46 90,53.9 90,39.17 C90,17.08 63.39,3.84 50,27.63 C36.61,3.84 10,17.08 10,39.17 C10,53.9 23.33,70.46 50,88.87 Z"
 				/>
 			</svg>
 		</button>
@@ -96,8 +93,15 @@
 		<script type="module">
 			import * as THREE from 'three';
 
+			// Global state
+			let hasClicked = false;
+			let snowflakesVisible = false;
+			let explosionParticles = [];
+			let explosionTime = 0;
+			const depthRange = { min: -20, max: 10 };
+
 			// Audio setup
-			const backgroundMusic = new Audio('christmas-ambient.mp3');
+			const backgroundMusic = new Audio("Five_O'Clock_-_JEKK.mp3");
 			backgroundMusic.loop = false;
 
 			// Scene setup
@@ -115,61 +119,7 @@
 			renderer.setSize(window.innerWidth, window.innerHeight);
 			document.getElementById('scene-container').appendChild(renderer.domElement);
 
-			// Create explosion heart particles
-			function createExplosionParticles(count) {
-				const particles = [];
-				const heartGeometry = createHeartGeometry(0.2);
-
-				for (let i = 0; i < count; i++) {
-					const material = new THREE.MeshBasicMaterial({
-						color: new THREE.Color(
-							Math.random() > 0.33 ? 1 : 0.5,
-							Math.random() > 0.33 ? 0 : 0.5,
-							Math.random() > 0.33 ? 0 : 0.8
-						),
-						transparent: true,
-						opacity: 0.8,
-						side: THREE.DoubleSide,
-					});
-
-					const heart = new THREE.Mesh(heartGeometry, material);
-
-					// Set initial position at center
-					heart.position.set(0, 0, 0);
-
-					// Random explosion direction
-					const theta = Math.random() * Math.PI * 2;
-					const phi = Math.random() * Math.PI;
-					const speed = Math.random() * 2 + 1;
-
-					heart.userData.velocity = new THREE.Vector3(
-						Math.sin(phi) * Math.cos(theta) * speed,
-						Math.sin(phi) * Math.sin(theta) * speed,
-						Math.cos(phi) * speed
-					);
-
-					heart.userData.rotationSpeed = (Math.random() - 0.5) * 0.1;
-
-					particles.push(heart);
-					scene.add(heart);
-				}
-				return particles;
-			}
-
-			// Existing geometry creation functions
-			function createHeartGeometry(size) {
-				const shape = new THREE.Shape();
-				const x = 0,
-					y = 0;
-
-				shape.moveTo(x, y);
-				shape.bezierCurveTo(x, y + size * 0.5, x + size * 0.5, y + size, x, y + size);
-				shape.bezierCurveTo(x - size * 0.5, y + size, x - size, y + size * 0.5, x, y);
-
-				const geometry = new THREE.ShapeGeometry(shape);
-				return geometry;
-			}
-
+			// Create detailed snowflake geometry
 			function createSnowflakeGeometry(size) {
 				const geometry = new THREE.BufferGeometry();
 				const vertices = [];
@@ -202,7 +152,36 @@
 				return geometry;
 			}
 
-			// Create regular snow particles
+			// Create heart geometry
+			function create3DHeartGeometry(size) {
+				const x = 0,
+					y = 0;
+
+				const heartShape = new THREE.Shape();
+				heartShape.moveTo(x + 25, y + 25);
+				heartShape.bezierCurveTo(x + 25, y + 25, x + 20, y, x, y);
+				heartShape.bezierCurveTo(x - 30, y, x - 30, y + 35, x - 30, y + 35);
+				heartShape.bezierCurveTo(x - 30, y + 55, x - 10, y + 77, x + 25, y + 95);
+				heartShape.bezierCurveTo(x + 60, y + 77, x + 80, y + 55, x + 80, y + 35);
+				heartShape.bezierCurveTo(x + 80, y + 35, x + 80, y, x + 50, y);
+				heartShape.bezierCurveTo(x + 35, y, x + 25, y + 25, x + 25, y + 25);
+
+				const extrudeSettings = {
+					depth: 8,
+					bevelEnabled: true,
+					bevelSegments: 8,
+					steps: 2,
+					bevelSize: 3,
+					bevelThickness: 3,
+				};
+
+				const geometry = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
+				geometry.scale(size * 0.01, size * 0.01, size * 0.01);
+				geometry.center();
+				return geometry;
+			}
+
+			// Create snow particles
 			const snowParticles = [];
 			const particleCount = 1000;
 
@@ -217,72 +196,131 @@
 
 				const particle = new THREE.LineSegments(geometry, material);
 
-				particle.position.set(
-					Math.random() * 200 - 100,
-					Math.random() * 200 - 100,
-					Math.random() * 100 - 50
-				);
+				const zPos = Math.random() * (depthRange.max - depthRange.min) + depthRange.min;
+				const spreadFactor = (zPos - depthRange.min) / (depthRange.max - depthRange.min);
+				const spread = 150 - spreadFactor * 100;
+
+				particle.position.set(Math.random() * spread - spread / 2, Math.random() * 200 - 100, zPos);
 
 				particle.userData.rotationSpeed = (Math.random() - 0.5) * 0.01;
 				particle.userData.fallSpeed = Math.random() * 0.15 + 0.01;
 				particle.userData.wobbleSpeed = Math.random() * 0.02;
 				particle.userData.wobbleAmplitude = Math.random() * 0.1;
 				particle.userData.initialX = particle.position.x;
-				particle.userData.isHeart = false;
+				particle.userData.zPos = zPos;
 
 				snowParticles.push(particle);
-				scene.add(particle);
 			}
 
-			camera.position.z = 50;
+			// Create explosion particles function
+			function createExplosionParticles(count) {
+				const particles = [];
+				const heartGeometry = create3DHeartGeometry(0.5);
 
-			let explosionParticles = [];
-			let explosionTime = 0;
-			const explosionDuration = 2000; // 2 seconds for explosion animation
-
-			// Start button handler
-			document.getElementById('start-heart').addEventListener('click', function () {
-				this.classList.add('hidden');
-
-				// Create explosion particles
-				explosionParticles = createExplosionParticles(50);
-				explosionTime = Date.now();
-
-				// Start background music
-				backgroundMusic.play();
-
-				// Fade in text
-				setTimeout(() => {
-					document.querySelector('.message-container').classList.add('fade-in');
-				}, 1000);
-
-				// Transform snowflakes after music
-				setTimeout(() => {
-					snowParticles.forEach((particle, index) => {
-						setTimeout(() => {
-							const size = Math.random() * 0.3 + 0.2;
-							const heartGeometry = createHeartGeometry(size);
-							const heartMaterial = new THREE.MeshBasicMaterial({
-								color: new THREE.Color(
-									Math.random() > 0.33 ? 1 : 0.5,
-									Math.random() > 0.33 ? 0 : 0.5,
-									Math.random() > 0.33 ? 0 : 0.8
-								),
-								transparent: true,
-								opacity: 0.8,
-								side: THREE.DoubleSide,
-							});
-
-							const heart = new THREE.Mesh(heartGeometry, heartMaterial);
-							heart.position.copy(particle.position);
-							heart.userData = { ...particle.userData, isHeart: true };
-
-							scene.remove(particle);
-							scene.add(heart);
-							snowParticles[index] = heart;
-						}, Math.random() * 1000);
+				for (let i = 0; i < count; i++) {
+					const material = new THREE.MeshPhongMaterial({
+						color: 0xff0000,
+						emissive: 0xff0000,
+						emissiveIntensity: 0.5,
+						shininess: 80,
+						transparent: true,
+						opacity: 0.9,
+						side: THREE.DoubleSide,
 					});
-				}, 10000);
+
+					const heart = new THREE.Mesh(heartGeometry, material);
+					heart.position.set(0, 0, -10);
+
+					const theta = Math.random() * Math.PI * 2;
+					const phi = Math.random() * Math.PI;
+					const speed = Math.random() * 0.5 + 0.5;
+
+					heart.userData.velocity = new THREE.Vector3(
+						Math.sin(phi) * Math.cos(theta),
+						Math.sin(phi) * Math.sin(theta),
+						Math.cos(phi)
+					).multiplyScalar(speed);
+
+					heart.userData.rotationSpeed = new THREE.Vector3(
+						Math.random() - 0.5,
+						Math.random() - 0.5,
+						Math.random() - 0.5
+					).multiplyScalar(0.05);
+
+					particles.push(heart);
+					scene.add(heart);
+				}
+				return particles;
+			}
+
+			// Add lighting
+			const pointLight = new THREE.PointLight(0xffffff, 1);
+			pointLight.position.set(0, 0, 5);
+			scene.add(pointLight);
+
+			const ambientLight = new THREE.AmbientLight(0x404040);
+			scene.add(ambientLight);
+
+			// Position camera
+			camera.position.z = 15;
+
+			// Click handler
+			document.getElementById('start-button').addEventListener('click', function () {
+				if (!hasClicked) {
+					hasClicked = true;
+					this.classList.add('hidden');
+
+					// Wait 1 second before starting
+					setTimeout(() => {
+						// Start music
+						backgroundMusic.play();
+
+						// Create explosion
+						explosionParticles = createExplosionParticles(100);
+						explosionTime = Date.now();
+
+						// Add snowflakes after explosion (2 seconds)
+						setTimeout(() => {
+							snowParticles.forEach((particle) => scene.add(particle));
+							snowflakesVisible = true;
+						}, 2000);
+
+						// Show text after 1 second
+						setTimeout(() => {
+							document.querySelector('.message-container').classList.add('fade-in');
+						}, 1000);
+
+						// Transform snowflakes to hearts after 5 seconds
+						setTimeout(() => {
+							snowParticles.forEach((particle, index) => {
+								setTimeout(() => {
+									const zPos = particle.userData.zPos;
+									const depthFactor = (zPos - depthRange.min) / (depthRange.max - depthRange.min);
+									const size = 0.8 - depthFactor * 0.4;
+									const heartGeometry = create3DHeartGeometry(size);
+
+									const heartMaterial = new THREE.MeshPhongMaterial({
+										color: 0xff0000,
+										emissive: 0xff0000,
+										emissiveIntensity: 0.5,
+										shininess: 80,
+										transparent: true,
+										opacity: 0.9,
+										side: THREE.DoubleSide,
+									});
+
+									const heart = new THREE.Mesh(heartGeometry, heartMaterial);
+									heart.position.copy(particle.position);
+									heart.userData = { ...particle.userData };
+
+									scene.remove(particle);
+									scene.add(heart);
+									snowParticles[index] = heart;
+								}, Math.random() * 2000);
+							});
+						}, 6000);
+					}, 1000);
+				}
 			});
 
 			// Animation function
@@ -292,12 +330,20 @@
 				// Animate explosion particles
 				if (explosionParticles.length > 0) {
 					const elapsed = Date.now() - explosionTime;
-					const progress = Math.min(elapsed / explosionDuration, 1);
+					const progress = Math.min(elapsed / 2000, 1);
 
 					explosionParticles.forEach((particle, i) => {
-						particle.position.add(particle.userData.velocity);
-						particle.rotation.z += particle.userData.rotationSpeed;
-						particle.material.opacity = Math.max(0, 1 - progress);
+						const speed = progress < 0.5 ? 0.2 - progress * 0.2 : 0.02;
+
+						particle.position.add(particle.userData.velocity.clone().multiplyScalar(speed));
+
+						particle.rotation.x += particle.userData.rotationSpeed.x * 0.1;
+						particle.rotation.y += particle.userData.rotationSpeed.y * 0.1;
+						particle.rotation.z += particle.userData.rotationSpeed.z * 0.1;
+
+						if (progress > 0.8) {
+							particle.material.opacity = (1 - progress) * 5;
+						}
 
 						if (progress === 1) {
 							scene.remove(particle);
@@ -308,27 +354,24 @@
 					});
 				}
 
-				// Animate snow/heart particles
-				snowParticles.forEach((particle) => {
-					particle.position.y -= particle.userData.fallSpeed;
-
-					if (particle.userData.isHeart) {
-						particle.rotation.z += particle.userData.rotationSpeed * 0.5;
-					} else {
+				// Only animate snow if it's visible
+				if (snowflakesVisible) {
+					snowParticles.forEach((particle) => {
+						particle.position.y -= particle.userData.fallSpeed;
 						particle.rotation.z += particle.userData.rotationSpeed;
-					}
 
-					particle.position.x =
-						particle.userData.initialX +
-						Math.sin(Date.now() * particle.userData.wobbleSpeed) *
-							particle.userData.wobbleAmplitude;
+						particle.position.x =
+							particle.userData.initialX +
+							Math.sin(Date.now() * particle.userData.wobbleSpeed) *
+								particle.userData.wobbleAmplitude;
 
-					if (particle.position.y < -100) {
-						particle.position.y = 100;
-						particle.position.x = Math.random() * 200 - 100;
-						particle.userData.initialX = particle.position.x;
-					}
-				});
+						if (particle.position.y < -100) {
+							particle.position.y = 100;
+							particle.position.x = Math.random() * 200 - 100;
+							particle.userData.initialX = particle.position.x;
+						}
+					});
+				}
 
 				renderer.render(scene, camera);
 			}
