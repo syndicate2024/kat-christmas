@@ -60,10 +60,54 @@
 				background: none;
 				border: none;
 				outline: none;
-				transition: transform 0.3s ease;
+				animation: heartbeat 1.2s ease-in-out infinite;
 			}
-			.start-heart:hover {
-				transform: translate(-50%, -50%) scale(1.1);
+			.start-heart::after {
+				content: '';
+				position: absolute;
+				top: 0;
+				left: -50%;
+				width: 200%;
+				height: 100%;
+				background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+				transform: skewX(-20deg);
+				animation: shine 3s infinite;
+			}
+			@keyframes heartbeat {
+				0% {
+					transform: translate(-50%, -50%) scale(1);
+				}
+				5% {
+					transform: translate(-50%, -50%) scale(1.15);
+				}
+				10% {
+					transform: translate(-50%, -50%) scale(1.05);
+				}
+				15% {
+					transform: translate(-50%, -50%) scale(1.2);
+				}
+				50% {
+					transform: translate(-50%, -50%) scale(1);
+				}
+				100% {
+					transform: translate(-50%, -50%) scale(1);
+				}
+			}
+			@keyframes shine {
+				0% {
+					left: -50%;
+					opacity: 0;
+				}
+				10% {
+					opacity: 0.3;
+				}
+				20% {
+					opacity: 0;
+				}
+				100% {
+					left: 150%;
+					opacity: 0;
+				}
 			}
 			.fade-in {
 				opacity: 1;
@@ -268,58 +312,67 @@
 			document.getElementById('start-button').addEventListener('click', function () {
 				if (!hasClicked) {
 					hasClicked = true;
+
+					// Start music immediately
+					backgroundMusic.play();
+
+					// Create explosion immediately as heart disappears
 					this.classList.add('hidden');
+					explosionParticles = createExplosionParticles(100);
+					explosionTime = Date.now();
 
-					// Wait 1 second before starting
+					// Show text after 1 second
 					setTimeout(() => {
-						// Start music
-						backgroundMusic.play();
-
-						// Create explosion
-						explosionParticles = createExplosionParticles(100);
-						explosionTime = Date.now();
-
-						// Add snowflakes after explosion (2 seconds)
-						setTimeout(() => {
-							snowParticles.forEach((particle) => scene.add(particle));
-							snowflakesVisible = true;
-						}, 2000);
-
-						// Show text after 1 second
-						setTimeout(() => {
-							document.querySelector('.message-container').classList.add('fade-in');
-						}, 1000);
-
-						// Transform snowflakes to hearts after 5 seconds
-						setTimeout(() => {
-							snowParticles.forEach((particle, index) => {
-								setTimeout(() => {
-									const zPos = particle.userData.zPos;
-									const depthFactor = (zPos - depthRange.min) / (depthRange.max - depthRange.min);
-									const size = 0.8 - depthFactor * 0.4;
-									const heartGeometry = create3DHeartGeometry(size);
-
-									const heartMaterial = new THREE.MeshPhongMaterial({
-										color: 0xff0000,
-										emissive: 0xff0000,
-										emissiveIntensity: 0.5,
-										shininess: 80,
-										transparent: true,
-										opacity: 0.9,
-										side: THREE.DoubleSide,
-									});
-
-									const heart = new THREE.Mesh(heartGeometry, heartMaterial);
-									heart.position.copy(particle.position);
-									heart.userData = { ...particle.userData };
-
-									scene.remove(particle);
-									scene.add(heart);
-									snowParticles[index] = heart;
-								}, Math.random() * 2000);
-							});
-						}, 6000);
+						document.querySelector('.message-container').classList.add('fade-in');
 					}, 1000);
+
+					// Add snowflakes after explosion plus fade (3 seconds total)
+					setTimeout(() => {
+						snowParticles.forEach((particle) => scene.add(particle));
+						snowflakesVisible = true;
+					}, 3000);
+
+					// Transform snowflakes to hearts after 30 seconds
+					setTimeout(() => {
+						snowParticles.forEach((particle, index) => {
+							setTimeout(() => {
+								const zPos = particle.userData.zPos;
+								const depthFactor = (zPos - depthRange.min) / (depthRange.max - depthRange.min);
+								const size = 0.8 - depthFactor * 0.4;
+								const heartGeometry = create3DHeartGeometry(size);
+
+								const heartMaterial = new THREE.MeshPhongMaterial({
+									color: 0xff0000,
+									emissive: 0xff0000,
+									emissiveIntensity: 0.5,
+									shininess: 80,
+									transparent: true,
+									opacity: 0.9,
+									side: THREE.DoubleSide,
+								});
+
+								const heart = new THREE.Mesh(heartGeometry, heartMaterial);
+								heart.position.copy(particle.position);
+								heart.userData = { ...particle.userData };
+
+								scene.remove(particle);
+								scene.add(heart);
+								snowParticles[index] = heart;
+							}, Math.random() * 2000);
+						});
+					}, 30000);
+
+					// Start fading out music near the end (2:45)
+					setTimeout(() => {
+						const fadeInterval = setInterval(() => {
+							if (backgroundMusic.volume > 0.01) {
+								backgroundMusic.volume -= 0.01;
+							} else {
+								backgroundMusic.pause();
+								clearInterval(fadeInterval);
+							}
+						}, 50);
+					}, 165000); // 2:45 (165 seconds)
 				}
 			});
 
